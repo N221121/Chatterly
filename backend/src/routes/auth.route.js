@@ -5,7 +5,7 @@ import {protectRoute} from "../middleware/auth.middleware.js";
 import {arcjetProtection} from "../middleware/arcjet.middleware.js";
 const router = express.Router();
 
-router.use(arcjetProtection);
+router.use(arcjetProtection);// this calls next() method. so that signup,login, ... are also called
 router.post("/signup", signup);
 
 router.post("/login",  login);
