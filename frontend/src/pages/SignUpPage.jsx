@@ -13,7 +13,7 @@ function SignUpPage() {
 
     signup(formData);
   }
-  return <div className="w-full min-h-screen flex items-center justify-center p-4">
+  return (<div className="w-full min-h-screen flex items-center justify-center p-4">
     <div className="relative w-full max-w-4xl md:h-[650px] h-[550px]">
       <BorderAnimatedContainer>
         <div className="w-full flex flex-col md:flex-row">
@@ -99,7 +99,7 @@ function SignUpPage() {
       </BorderAnimatedContainer>
     </div>
   </div>
-
+  );
 }
 
 export default SignUpPage
