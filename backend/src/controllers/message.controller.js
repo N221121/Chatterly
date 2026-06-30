@@ -81,13 +81,13 @@ export const getChatPartners = async (req,res) => {
         const chatPartnerIds = [
             ...new Set( // put this in a set to avoid duplicate partners
                 messages.map((msg) => 
-                    msg.senderId === loggedInUserId.toString() // it means if sender is us then we should fetch the receiver id 
+                    msg.senderId.toString === loggedInUserId.toString() // it means if sender is us then we should fetch the receiver id 
                         ? msg.receiverId.toString()
                         : msg.senderId.toString())
     ),
     ];
     const chatPartners =  await User.find({_id: {$in: chatPartnerIds}});
-    req.status(200).json(chatPartners); // get response as all partners
+    res.status(200).json(chatPartners); // get response as all partners
     }
     catch(error){
         console.error("Error in getChatPartners");
