@@ -9,7 +9,7 @@ import {arcjetProtection} from "../middleware/arcjet.middleware.js";
 const router = express.Router();
 router.use(arcjetProtection,protectRoute);//middlewares
 router.get("/contacts" , getAllContacts); // for getting all friends/contacts
-router.get("/chat", getChatPartners); // for getting only the chat parteners 
+router.get("/chats", getChatPartners); // for getting only the chat parteners 
 router.get("/:id", getMessagesByUserId); // for gettig the messages or chat of a specific user when we click on that specific contact/friend
 
 router.post("/send/:id", sendMessage);//for sending messages to a specific friend

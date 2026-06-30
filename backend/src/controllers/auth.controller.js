@@ -89,7 +89,7 @@ export const updateProfile = async(req,res) => {
         if(!profilePhoto) return res.status(400).json({message:"Profile pic is generated"});
         const userid = req.user._id;
         const uploadResponse = await cloudinary.uploader.upload(profilePhoto);
-        const updatedUser = await User.findByAndUpdate(
+        const updatedUser = await User.findByIdAndUpdate(
             userid,
             { profilePhoto : uploadResponse.secure_url},
             {new: true}
