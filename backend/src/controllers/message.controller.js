@@ -1,5 +1,6 @@
 import Message from "../models/Message.js";
 import User from "../models/User.js";
+import cloudinary from "../lib/cloudinary.js";
 
 export const getAllContacts = async (req , res) => {
     try{
@@ -81,7 +82,7 @@ export const getChatPartners = async (req,res) => {
         const chatPartnerIds = [
             ...new Set( // put this in a set to avoid duplicate partners
                 messages.map((msg) => 
-                    msg.senderId.toString === loggedInUserId.toString() // it means if sender is us then we should fetch the receiver id 
+                    msg.senderId.toString() === loggedInUserId.toString() // it means if sender is us then we should fetch the receiver id 
                         ? msg.receiverId.toString()
                         : msg.senderId.toString())
     ),
