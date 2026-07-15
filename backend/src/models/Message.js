@@ -1,16 +1,16 @@
-import mongoose from"mongoose";
+import mongoose from "mongoose";
 const messageSchema = new mongoose.Schema({
-    senderId:{
+    senderId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true,
     },
-    receiverId:{
+    receiverId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true,
     },
-    text:{
+    text: {
         type: String,
         trim: true,
         maxlength: 2000,
@@ -18,8 +18,16 @@ const messageSchema = new mongoose.Schema({
     image: {
         type: String,
     },
-    
-} , { timestamps: true }
+    voice: {
+        type: String,
+        default: "",
+    },
+    isDeleted: {
+        type: Boolean,
+        default: false,
+    },
+
+}, { timestamps: true }
 );
 const Message = mongoose.model("Message", messageSchema);
 export default Message;

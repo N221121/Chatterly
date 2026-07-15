@@ -1,4 +1,5 @@
 const keyStrokeSounds = [
+  new Audio("/sounds/keySound.mp3"),
   new Audio("/sounds/keystroke.mp3"),
   new Audio("/sounds/keyStroke-2.mp3"),
   new Audio("/sounds/keyStroke-3.mp3"),
