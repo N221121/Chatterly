@@ -84,19 +84,38 @@ export const useAuthStore = create((set,get)=>({
         toast.error(error.response.data.messages);
     }
    },
-   connectSocket: ()=>{
-    const {authUser} = get();
-    if(!authUser || get().socket?.connected) return;
+connectSocket: () => {
+    const { authUser } = get();
 
-    const socket = io(BASE_URL,{withCredentials:true});
-    socket.connect();
-    set({socket});
+    if (!authUser || get().socket?.connected) return;
 
-    //listen for online users
-    socket.on("getOnlineUsers",(userIds)=>{
-        set({onlineUsers: userIds});
+    const socket = io(BASE_URL, {
+        withCredentials: true,
+        transports: ["websocket", "polling"],
     });
-   },
+
+    socket.on("connect", () => {
+        console.log("✅ Socket Connected:", socket.id);
+    });
+
+    socket.on("connect_error", (err) => {
+        console.log("❌ Socket Error:", err.message);
+    });
+
+    socket.on("disconnect", (reason) => {
+        console.log("❌ Socket Disconnected:", reason);
+    });
+
+    socket.on("getOnlineUsers", (userIds) => {
+        console.log("ONLINE USERS:", userIds);
+        set({ onlineUsers: userIds });
+    });
+
+    // Optional
+    // socket.connect();
+
+    set({ socket });
+},
    disconnectSocket:()=>{
     if(get().socket?.connected) get().socket.disconnect();
    }
