@@ -74,16 +74,22 @@ export const sendMessage = async (req, res) => {
         await newMessage.save();
 
         const receiverSocketId = getReceiverSocketId(receiverId);
+
+        console.log("========== SEND MESSAGE ==========");
+        console.log("Sender:", senderId.toString());
+        console.log("Receiver:", receiverId);
+        console.log("Receiver Socket:", receiverSocketId);
+
         if (receiverSocketId) {
             io.to(receiverSocketId).emit("newMessage", newMessage);
         }
         res.status(201).json(newMessage);
     }
-   catch (error) {
-    console.error("SEND MESSAGE ERROR:");
-    console.error(error);
-    res.status(500).json({ message: error.message });
-}
+    catch (error) {
+        console.error("SEND MESSAGE ERROR:");
+        console.error(error);
+        res.status(500).json({ message: error.message });
+    }
 };
 
 //here we only get the chats that (sender is us , receiver is us)
