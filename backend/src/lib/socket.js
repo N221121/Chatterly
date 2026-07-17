@@ -26,8 +26,9 @@ io.on("connection", (socket) => {
     console.log("A user connected", socket.user.fullName);
 
     const userId = socket.userId;
-    userSocketMap[userId] = socket.id
-
+    userSocketMap[userId] = socket.id;
+    
+    console.log("Current Online Users:", userSocketMap);
 
     //io.emit() is used to send events to all connected clients
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
