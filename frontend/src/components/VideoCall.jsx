@@ -17,6 +17,8 @@ export default function VideoCall({ isOpen, onClose }) {
 
     const { selectedUser } = useChatStore();
 
+    const [seconds, setSeconds] = useState(0);
+
 
     const localVideo = useRef(null);
     const remoteVideo = useRef(null);
@@ -48,7 +50,35 @@ export default function VideoCall({ isOpen, onClose }) {
 
         peerConnection.current.ontrack = (event) => {
 
-            remoteVideo.current.srcObject = event.streams[0];
+            const stream = event.streams[0];
+
+            if (remoteVideo.current) {
+                remoteVideo.current.srcObject = stream;
+            }
+
+            const audioTrack = stream.getAudioTracks()[0];
+
+            if (audioTrack) {
+
+                audioTrack.onmute = () => {
+                    console.log("Remote mic muted");
+                };
+
+                audioTrack.onunmute = () => {
+                    console.log("Remote mic unmuted");
+                };
+
+            }
+
+            const videoTrack = stream.getVideoTracks()[0];
+
+            if (videoTrack) {
+
+                videoTrack.onended = () => {
+                    console.log("Remote camera off");
+                };
+
+            }
 
         };
 
@@ -67,11 +97,41 @@ export default function VideoCall({ isOpen, onClose }) {
             }
 
         };
+        peerConnection.current.onconnectionstatechange = () => {
+
+            console.log(
+                "Connection:",
+                peerConnection.current.connectionState
+            );
+
+            if (
+                peerConnection.current.connectionState === "failed" ||
+                peerConnection.current.connectionState === "closed" ||
+                peerConnection.current.connectionState === "disconnected"
+            ) {
+
+                cleanupCall();
+
+            }
+
+        };
+        peerConnection.current.oniceconnectionstatechange = () => {
+
+            console.log(
+                "ICE:",
+                peerConnection.current.iceConnectionState
+            );
+
+        };
 
     };
     const startCall = async () => {
         try {
             setCalling(true);
+            if (localStream.current) {
+                localStream.current.getTracks().forEach(track => track.stop());
+                localStream.current = null;
+            }
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: true,
                 audio: true,
@@ -99,6 +159,8 @@ export default function VideoCall({ isOpen, onClose }) {
 
 
         } catch (err) {
+
+            cleanupCall();
             console.error("getUserMedia Error:", err);
             console.log("Error name:", err.name);
             console.log("Error message:", err.message);
@@ -122,73 +184,104 @@ export default function VideoCall({ isOpen, onClose }) {
         }
     };
     const answerCall = async () => {
+        try {
 
-        const stream = await navigator.mediaDevices.getUserMedia({
+            if (localStream.current) {
+                localStream.current.getTracks().forEach(track => track.stop());
+                localStream.current = null;
+            }
 
-            video: true,
+            const stream = await navigator.mediaDevices.getUserMedia({
 
-            audio: true,
+                video: true,
 
-        });
+                audio: true,
 
-        localStream.current = stream;
+            });
 
-        localVideo.current.srcObject = stream;
+            localStream.current = stream;
 
-        createPeerConnection();
+            localVideo.current.srcObject = stream;
 
-        stream.getTracks().forEach(track => {
+            createPeerConnection();
 
-            peerConnection.current.addTrack(track, stream);
+            stream.getTracks().forEach(track => {
 
-        });
+                peerConnection.current.addTrack(track, stream);
 
-        await peerConnection.current.setRemoteDescription(
-            incomingCall.offer
-        );
+            });
 
-        for (const candidate of pendingCandidates.current) {
-            await peerConnection.current.addIceCandidate(
-                new RTCIceCandidate(candidate)
+            await peerConnection.current.setRemoteDescription(
+                new RTCSessionDescription(incomingCall.offer)
             );
+
+            for (const candidate of pendingCandidates.current) {
+                await peerConnection.current.addIceCandidate(
+                    new RTCIceCandidate(candidate)
+                );
+            }
+
+            pendingCandidates.current = [];
+
+            const answer = await peerConnection.current.createAnswer();
+
+            await peerConnection.current.setLocalDescription(answer);
+
+            socket.emit("answer-call", {
+                to: incomingCall.from,
+                answer,
+            });
+
+            setIncomingCall(null);
+
+            setInCall(true);
         }
+        catch (err) {
 
-        pendingCandidates.current = [];
+            cleanupCall();
 
-        const answer = await peerConnection.current.createAnswer();
-
-        await peerConnection.current.setLocalDescription(answer);
-
-        socket.emit("answer-call", {
-
-            to: incomingCall.from,
-
-            answer,
-
-        });
-
-        setIncomingCall(null);
-
-        setInCall(true);
+            if (err.name === "NotAllowedError") {
+                alert("Please allow camera and microphone.");
+            } else {
+                alert(err.message);
+            }
+        }
 
     };
     const cleanupCall = () => {
 
-        peerConnection.current?.close();
-        peerConnection.current = null;
+        if (peerConnection.current) {
 
-        localStream.current?.getTracks().forEach(track => track.stop());
-        localStream.current = null;
+            peerConnection.current.ontrack = null;
+            peerConnection.current.onicecandidate = null;
 
-        if (localVideo.current)
+            peerConnection.current.close();
+            peerConnection.current = null;
+        }
+
+        if (localStream.current) {
+
+            localStream.current.getTracks().forEach(track => track.stop());
+
+            localStream.current = null;
+        }
+
+        if (localVideo.current) {
             localVideo.current.srcObject = null;
+        }
 
-        if (remoteVideo.current)
+        if (remoteVideo.current) {
             remoteVideo.current.srcObject = null;
+        }
+
+        pendingCandidates.current = [];
 
         setIncomingCall(null);
         setCalling(false);
         setInCall(false);
+        setSeconds(0);
+        setMicOn(true);
+        setCameraOn(true);
 
         onClose?.();
     };
@@ -200,26 +293,25 @@ export default function VideoCall({ isOpen, onClose }) {
         cleanupCall();
     };
     const toggleMic = () => {
+        if (!localStream.current) return;
 
         localStream.current.getAudioTracks().forEach(track => {
-
             track.enabled = !track.enabled;
-
         });
 
-        setMicOn(!micOn);
+        setMicOn(prev => !prev);
 
     };
 
     const toggleCamera = () => {
 
+        if (!localStream.current) return;
+
         localStream.current.getVideoTracks().forEach(track => {
-
             track.enabled = !track.enabled;
-
         });
 
-        setCameraOn(!cameraOn);
+        setCameraOn(prev => !prev);
 
     };
 
@@ -258,6 +350,19 @@ export default function VideoCall({ isOpen, onClose }) {
                 localVideo.current.srcObject = cameraStream;
 
                 localStream.current = cameraStream;
+                screenStream.getTracks().forEach(track => track.stop());
+
+                cameraStream.getTracks().forEach(track => {
+
+                    const sender = peerConnection.current
+                        .getSenders()
+                        .find(s => s.track?.kind === track.kind);
+
+                    if (sender) {
+                        sender.replaceTrack(track);
+                    }
+
+                });
             };
 
         } catch (err) {
@@ -274,21 +379,14 @@ export default function VideoCall({ isOpen, onClose }) {
             setIncomingCall(data);
         });
 
-        /*socket.on("call-answered", async ({ answer }) => {
-
-            await peerConnection.current.setRemoteDescription(answer);
-
-            setCalling(false);
-
-            setInCall(true);
-
-        });*/
 
         socket.on("call-answered", async ({ answer }) => {
 
             if (!peerConnection.current) return;
 
-            await peerConnection.current.setRemoteDescription(answer);
+            await peerConnection.current.setRemoteDescription(
+                new RTCSessionDescription(answer)
+            );
 
             setCalling(false);
             setInCall(true);
@@ -331,10 +429,12 @@ export default function VideoCall({ isOpen, onClose }) {
 
             alert("Call Rejected");
 
-            setCalling(false);
+            cleanupCall();
 
         });
         socket.on("end-call", () => {
+
+            alert("Call ended");
 
             cleanupCall();
 
@@ -350,23 +450,70 @@ export default function VideoCall({ isOpen, onClose }) {
 
     }, [socket]);
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && !calling && !inCall && !localStream.current) {
             startCall();
         }
     }, [isOpen]);
     useEffect(() => {
 
         return () => {
-
-            peerConnection.current?.close();
-
-            localStream.current
-                ?.getTracks()
-                .forEach(track => track.stop());
-
+            cleanupCall();
         };
 
     }, []);
+    useEffect(() => {
+
+        const handleUnload = () => {
+
+            if (selectedUser) {
+
+                socket.emit("end-call", {
+                    to: selectedUser._id,
+                });
+
+            }
+
+            cleanupCall();
+
+        };
+
+        window.addEventListener("beforeunload", handleUnload);
+
+        return () => {
+            window.removeEventListener("beforeunload", handleUnload);
+        };
+
+    }, [selectedUser, socket]);
+    useEffect(() => {
+
+        if (!incomingCall) return;
+
+        const timer = setTimeout(() => {
+
+            socket.emit("call-rejected", {
+                to: incomingCall.from,
+            });
+
+            cleanupCall();
+
+        }, 30000);
+
+        return () => clearTimeout(timer);
+
+    }, [incomingCall]);
+    useEffect(() => {
+
+        if (!inCall) return;
+
+        const timer = setInterval(() => {
+
+            setSeconds(prev => prev + 1);
+
+        }, 1000);
+
+        return () => clearInterval(timer);
+
+    }, [inCall]);
     return (
 
         <>
@@ -408,7 +555,7 @@ export default function VideoCall({ isOpen, onClose }) {
                                         to: incomingCall.from,
                                     });
 
-                                    setIncomingCall(null);
+                                    cleanupCall();
 
                                 }}
                                 className="btn btn-error"
@@ -449,14 +596,22 @@ export default function VideoCall({ isOpen, onClose }) {
                         />
                     </div>
                     <div className="flex justify-center gap-5 p-5">
+                        <div className="text-white text-lg font-semibold">
 
-                        <button onClick={toggleMic}>
+                            {Math.floor(seconds / 60)}:
+                            {String(seconds % 60).padStart(2, "0")}
+
+                        </div>
+
+                        <button disabled={!localStream.current}
+                            onClick={toggleMic}>
 
                             {micOn ? <Mic /> : <MicOff />}
 
                         </button>
 
-                        <button onClick={toggleCamera}>
+                        <button disabled={!localStream.current}
+                            onClick={toggleCamera}>
 
                             {cameraOn ? <Video /> : <VideoOff />}
 
