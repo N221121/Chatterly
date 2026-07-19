@@ -106,12 +106,9 @@ export default function VideoCall({ isOpen, onClose }) {
 
             if (
                 peerConnection.current.connectionState === "failed" ||
-                peerConnection.current.connectionState === "closed" ||
-                peerConnection.current.connectionState === "disconnected"
+                peerConnection.current.connectionState === "closed"
             ) {
-
                 cleanupCall();
-
             }
 
         };
@@ -198,6 +195,7 @@ export default function VideoCall({ isOpen, onClose }) {
                 audio: true,
 
             });
+            if (!incomingCall) return;
 
             localStream.current = stream;
 
@@ -249,30 +247,22 @@ export default function VideoCall({ isOpen, onClose }) {
 
     };
     const cleanupCall = () => {
+        if (!peerConnection.current && !localStream.current) return;
 
         if (peerConnection.current) {
-
             peerConnection.current.ontrack = null;
             peerConnection.current.onicecandidate = null;
-
             peerConnection.current.close();
             peerConnection.current = null;
         }
 
         if (localStream.current) {
-
             localStream.current.getTracks().forEach(track => track.stop());
-
             localStream.current = null;
         }
 
-        if (localVideo.current) {
-            localVideo.current.srcObject = null;
-        }
-
-        if (remoteVideo.current) {
-            remoteVideo.current.srcObject = null;
-        }
+        if (localVideo.current) localVideo.current.srcObject = null;
+        if (remoteVideo.current) remoteVideo.current.srcObject = null;
 
         pendingCandidates.current = [];
 
@@ -299,7 +289,11 @@ export default function VideoCall({ isOpen, onClose }) {
             track.enabled = !track.enabled;
         });
 
-        setMicOn(prev => !prev);
+        const enabled = localStream.current
+            .getAudioTracks()[0]
+            .enabled;
+
+        setMicOn(enabled);
 
     };
 
@@ -311,7 +305,11 @@ export default function VideoCall({ isOpen, onClose }) {
             track.enabled = !track.enabled;
         });
 
-        setCameraOn(prev => !prev);
+        const enabled = localStream.current
+            .getVideoTracks()[0]
+            .enabled;
+
+        setCameraOn(enabled);
 
     };
 
@@ -343,23 +341,19 @@ export default function VideoCall({ isOpen, onClose }) {
                     audio: true,
                 });
 
-                const cameraTrack = cameraStream.getVideoTracks()[0];
-
-                sender.replaceTrack(cameraTrack);
-
                 localVideo.current.srcObject = cameraStream;
 
                 localStream.current = cameraStream;
                 screenStream.getTracks().forEach(track => track.stop());
 
-                cameraStream.getTracks().forEach(track => {
+                cameraStream.getTracks().forEach(async (track) => {
 
                     const sender = peerConnection.current
                         .getSenders()
                         .find(s => s.track?.kind === track.kind);
 
                     if (sender) {
-                        sender.replaceTrack(track);
+                        await sender.replaceTrack(track);
                     }
 
                 });
@@ -392,15 +386,6 @@ export default function VideoCall({ isOpen, onClose }) {
             setInCall(true);
         });
 
-        /*socket.on("ice-candidate", async ({ candidate }) => {
-
-            if (candidate) {
-
-                await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
-
-            }
-
-        });*/
 
         socket.on("ice-candidate", async ({ candidate }) => {
 
@@ -618,6 +603,7 @@ export default function VideoCall({ isOpen, onClose }) {
                         </button>
 
                         <button
+                            disabled={!peerConnection.current}
                             onClick={shareScreen}
                             className="btn btn-primary"
                         >
